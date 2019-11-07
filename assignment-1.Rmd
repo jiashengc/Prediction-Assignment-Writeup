@@ -1,0 +1,96 @@
+---
+title: "Prediction Assignment Writeup"
+author: "Jia Sheng Chong"
+date: "10/30/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+setwd("C:/Users/jiash/Dropbox/R-repo/c8-cp1/")
+# knitr::opts_chunk$set(echo = FALSE)
+library(ggplot2)
+library(GGally)
+library(caret)
+library(klaR)
+library(kernlab)
+library(corrplot)
+
+set.seed(666)
+```
+
+## Overview
+The purpose of this report is to predict the manner in which a person has done an exercise. The main aim of this report is to predict the manner of 6 different particpants and their exercise.
+
+
+## Data Analysis
+```{r echo=TRUE}
+raw <- data.frame()
+raw.test  <- read.csv(file = 'pml-testing.csv', header = TRUE)
+raw.train <- read.csv(file = 'pml-training.csv', header = TRUE)
+
+dim(raw.test)
+dim(raw.train)
+
+# Calculating the percentage of test to training data provided
+(dim(raw.test)[1]/dim(raw.train)[1]) * 100
+
+# Percentage of classes
+percentage <- prop.table(table(raw.train$classe)) * 100
+cbind(freq=table(raw.train$classe), percentage = percentage)
+
+```
+We can observe there are 160 columns for the data provided to us. The test data we have been given contains 20 rows, while the training data contains 19622 rows. However, because the percentage of testing data to training data is 0.1%, I will use the training data to create my own test data and perform cross validation. After which, I will use the final model created to predict the test data that was initially provided. 
+
+### Cleaning Data
+As the given testing data contains columns which only contains NA values, we will remove these columns as they are worthless for predicting our test data. We also remove the first 5 columns as they provide no value to our models.
+```{r echo = TRUE}
+# Clean data, clean data which contains only NA values
+clean <- data.frame()
+keepCol <- colSums(is.na(raw.test)) < nrow(raw.test)
+clean.test <- raw.test[,keepCol]
+clean.train <- raw.train[,keepCol]
+
+# Remove useless information
+clean.test <- clean.test[,-c(1:5)]
+clean.train <- clean.train[,-c(1:5)]
+
+clean.train$classe <- factor(clean.train$classe)
+
+# Remove any data that contains NA in the any columns
+clean.trainNoNA <- data.frame(na.omit(clean.train))
+dim(clean.trainNoNA)
+
+```
+
+## Using Cross Validation
+To train and test our models, we will use cross validation (5 folds)
+```{r echo = true}
+train <- data.frame()
+train.data <- clean.trainNoNA
+
+train.control <- trainControl(method = 'cv', number = 5)
+```
+
+## Training
+```{r echo = true}
+predictions <- data.frame()
+
+model.knn <- train(classe ~ ., data = train.data, method = 'knn', trControl = train.control)
+
+model.svm <- train(classe ~ ., data = train.data, method = 'svmRadial', trControl = train.control)
+
+model.lda <- train(classe ~ ., data = train.data, method = 'lda', trControl = train.control)
+
+# Compare accuracy
+results <- resamples(list(knn=model.knn, svm=model.svm, lda=model.lda))
+summary(results)
+
+summary(model.lda)
+```
+
+## Final Prediction
+```{r echo=true}
+finalPredict <- predict(model.svm, newdata = clean.test)
+finalPredict
+```
+
