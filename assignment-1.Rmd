@@ -2,18 +2,21 @@
 title: "Prediction Assignment Writeup"
 author: "Jia Sheng Chong"
 date: "10/30/2019"
-output: html_document
+output:
+  html_document:
+    keep_md: true
 ---
 
-```{r setup, include=FALSE}
+```{r echo=TRUE}
 setwd("C:/Users/jiash/Dropbox/R-repo/c8-cp1/")
-# knitr::opts_chunk$set(echo = FALSE)
 library(ggplot2)
 library(GGally)
 library(caret)
 library(klaR)
 library(kernlab)
 library(corrplot)
+library(knitr)
+library(readr)
 
 set.seed(666)
 ```
@@ -25,8 +28,8 @@ The purpose of this report is to predict the manner in which a person has done a
 ## Data Analysis
 ```{r echo=TRUE}
 raw <- data.frame()
-raw.test  <- read.csv(file = 'pml-testing.csv', header = TRUE)
-raw.train <- read.csv(file = 'pml-training.csv', header = TRUE)
+raw.test  <- read_csv(file = './data/pml_testing.csv', col_names = TRUE)
+raw.train <- read_csv(file = './data/pml_training.csv', col_names = TRUE)
 
 dim(raw.test)
 dim(raw.train)
@@ -63,33 +66,40 @@ dim(clean.trainNoNA)
 ```
 
 ## Using Cross Validation
-To train and test our models, we will use cross validation (5 folds)
-```{r echo = true}
-train <- data.frame()
-train.data <- clean.trainNoNA
-
-train.control <- trainControl(method = 'cv', number = 5)
+To train and test our models, we will use cross validation (5 folds). We use cross validation so that we can use our model to predict over all our data. Using this method means that we do not have to split our data as the cross validation already does that for us.
+```{r echo = TRUE}
+forTrain.data <- clean.trainNoNA
+forTrain.control <- trainControl(method = 'cv', number = 5)
 ```
 
-## Training
-```{r echo = true}
+## Training and building the model
+To build our final model, I will use 3 different algorithms, knn, svm and lda.
+```{r echo = TRUE}
 predictions <- data.frame()
 
-model.knn <- train(classe ~ ., data = train.data, method = 'knn', trControl = train.control)
+model.knn <- train(classe ~ ., data = forTrain.data, method = 'knn', trControl = forTrain.control)
 
-model.svm <- train(classe ~ ., data = train.data, method = 'svmRadial', trControl = train.control)
+model.svm <- train(classe ~ ., data = forTrain.data, method = 'svmRadial', trControl = forTrain.control)
 
-model.lda <- train(classe ~ ., data = train.data, method = 'lda', trControl = train.control)
+model.lda <- train(classe ~ ., data = forTrain.data, method = 'lda', trControl = forTrain.control)
 
 # Compare accuracy
 results <- resamples(list(knn=model.knn, svm=model.svm, lda=model.lda))
 summary(results)
 
-summary(model.lda)
+summary(model.svm)
+```
+After training our models, I compare them using the resamples function. In the summary of our results, we can see that performed the best accuracy over knn and lda. Hence, we will use svm to predict the assignment's test data.
+
+## Sample Error
+Using our svm model to predict our training model, we get an out of sample error of 5.28%.
+```{r echo = TRUE}
+trainPredict <- predict(model.svm, newdata = clean.train)
+confusionMatrix(trainPredict, clean.train$classe)
 ```
 
 ## Final Prediction
-```{r echo=true}
+```{r echo = TRUE}
 finalPredict <- predict(model.svm, newdata = clean.test)
 finalPredict
 ```
